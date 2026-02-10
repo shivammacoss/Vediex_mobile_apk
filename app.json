@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Vediex",
+    "slug": "vediex",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/vediexicon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/Vediex.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vediex.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/vediexicon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.vediex.app"
+    },
+    "web": {
+      "favicon": "./assets/vediexicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
