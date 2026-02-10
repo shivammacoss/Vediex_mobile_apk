@@ -27,13 +27,19 @@
       "favicon": "./assets/vediexicon.png"
     },
     "updates": {
-      "url": "https://u.expo.dev/your-project-id"
+      "url": "https://u.expo.dev/14acfb29-d13d-4a3c-934f-94407769fb7d"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "14acfb29-d13d-4a3c-934f-94407769fb7d"
+      }
+    },
+    "owner": "shivam92388"
   }
 }
