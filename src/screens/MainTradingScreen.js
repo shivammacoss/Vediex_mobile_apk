@@ -1609,6 +1609,36 @@ const QuotesTab = ({ navigation }) => {
   const { colors } = useTheme();
   const toast = useToast();
   const orderScrollRef = useRef(null);
+  const panelTranslateY = useRef(new Animated.Value(0)).current;
+  const panelPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          panelTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          Animated.timing(panelTranslateY, {
+            toValue: 600,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowOrderPanel(false);
+            panelTranslateY.setValue(0);
+          });
+        } else {
+          Animated.spring(panelTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 8,
+          }).start();
+        }
+      },
+    })
+  ).current;
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('watchlist');
   const [expandedSegment, setExpandedSegment] = useState(null);
@@ -1973,16 +2003,18 @@ const QuotesTab = ({ navigation }) => {
             activeOpacity={1} 
             onPress={() => setShowOrderPanel(false)}
           />
-          <ScrollView 
-            ref={orderScrollRef}
-            style={[styles.orderPanelScroll, { backgroundColor: colors.bgCard }]} 
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={[styles.orderPanelContainer, { backgroundColor: colors.bgCard }]}>
-              {/* Handle Bar */}
+          <Animated.View style={[styles.orderPanelScroll, { backgroundColor: colors.bgCard, transform: [{ translateY: panelTranslateY }] }]}>
+            {/* Swipe Handle */}
+            <View {...panelPanResponder.panHandlers} style={{ paddingTop: 8, paddingBottom: 4, alignItems: 'center' }}>
               <View style={[styles.orderPanelHandle, { backgroundColor: colors.border }]} />
+            </View>
+            <ScrollView 
+              ref={orderScrollRef}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+            <View style={[styles.orderPanelContainer, { backgroundColor: colors.bgCard }]}>
               
               {/* Header */}
               <View style={styles.orderPanelHeaderRow}>
@@ -2234,7 +2266,8 @@ const QuotesTab = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
+            </ScrollView>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3430,6 +3463,9 @@ const ChartTab = ({ route }) => {
   }, [route?.params?.symbol]);
   const [showOrderPanel, setShowOrderPanel] = useState(false);
   const [orderSide, setOrderSide] = useState('BUY');
+  const [orderType, setOrderType] = useState('MARKET');
+  const [pendingType, setPendingType] = useState('LIMIT');
+  const [pendingPrice, setPendingPrice] = useState('');
   const [volume, setVolume] = useState(0.01);
   const [volumeText, setVolumeText] = useState('0.01');
   const [isExecuting, setIsExecuting] = useState(false);
@@ -3438,6 +3474,41 @@ const ChartTab = ({ route }) => {
   const [showChartSlModal, setShowChartSlModal] = useState(false);
   const [chartSlValue, setChartSlValue] = useState('');
   const [pendingChartTradeSide, setPendingChartTradeSide] = useState(null);
+  const [showQuickSlModal, setShowQuickSlModal] = useState(false);
+  const [quickSlValue, setQuickSlValue] = useState('');
+  const [pendingQuickTradeSide, setPendingQuickTradeSide] = useState(null);
+  const chartOrderScrollRef = useRef(null);
+
+  const chartPanelTranslateY = useRef(new Animated.Value(0)).current;
+  const chartPanelPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          chartPanelTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          Animated.timing(chartPanelTranslateY, {
+            toValue: 600,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowOrderPanel(false);
+            chartPanelTranslateY.setValue(0);
+          });
+        } else {
+          Animated.spring(chartPanelTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 8,
+          }).start();
+        }
+      },
+    })
+  ).current;
   
   // Get leverage from account
   const getAccountLeverage = () => {
@@ -3585,6 +3656,7 @@ const ChartTab = ({ route }) => {
         ? ctx.selectedChallengeAccount._id 
         : ctx.selectedAccount?._id;
       
+      const effectiveOrderType = orderType === 'PENDING' ? pendingType : 'MARKET';
       const orderData = {
         userId: ctx.user?._id,
         tradingAccountId: tradingAccountId,
@@ -3594,9 +3666,14 @@ const ChartTab = ({ route }) => {
         quantity: volume,
         bid: currentPrice?.bid,
         ask: currentPrice?.ask,
-        leverage: ctx.selectedAccount?.leverage || '1:100',
-        orderType: 'MARKET'
+        leverage: ctx.isChallengeMode ? ctx.selectedChallengeAccount?.leverage : ctx.selectedAccount?.leverage || '1:100',
+        orderType: effectiveOrderType
       };
+      
+      // Add pending price if pending order
+      if (orderType === 'PENDING' && pendingPrice) {
+        orderData.pendingPrice = parseFloat(pendingPrice);
+      }
       
       // Add SL/TP if set
       if (stopLoss) orderData.sl = parseFloat(stopLoss);
@@ -3610,10 +3687,12 @@ const ChartTab = ({ route }) => {
       const data = await res.json();
       if (data.success) {
         const isChallengeMsg = data.isChallengeAccount ? ' (Challenge)' : '';
-        toast?.showToast(`${orderSide} order placed!${isChallengeMsg}`, 'success');
+        const orderLabel = orderType === 'MARKET' ? 'Market' : pendingType;
+        toast?.showToast(`${orderSide} ${orderLabel} order placed!${isChallengeMsg}`, 'success');
         setShowOrderPanel(false);
         setStopLoss('');
         setTakeProfit('');
+        setPendingPrice('');
         ctx.fetchOpenTrades();
         ctx.fetchAccountSummary();
       } else {
@@ -3697,7 +3776,10 @@ const ChartTab = ({ route }) => {
             <TouchableOpacity 
               key={tab.id}
               style={[styles.chartTab, { backgroundColor: colors.bgCard }, activeTabId === tab.id && styles.chartTabActive]}
-              onPress={() => setActiveTabId(tab.id)}
+              onPress={() => {
+                setActiveTabId(tab.id);
+                setShowOrderPanel(true);
+              }}
               onLongPress={() => removeChartTab(tab.id)}
             >
               <Text style={[styles.chartTabText, { color: colors.textMuted }, activeTabId === tab.id && styles.chartTabTextActive]}>
@@ -3781,96 +3863,279 @@ const ChartTab = ({ route }) => {
         />
       </View>
 
-      {/* Order Panel Slide Up */}
+      {/* Full Order Panel Slide Up */}
       <Modal visible={showOrderPanel} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.orderSlidePanel}>
-            <View style={styles.orderPanelHandle} />
-            <View style={styles.orderPanelHeader}>
-              <Text style={styles.orderPanelTitle}>{activeSymbol}</Text>
-              <TouchableOpacity onPress={() => setShowOrderPanel(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
+        <KeyboardAvoidingView 
+          style={styles.orderModalOverlay} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <TouchableOpacity 
+            style={styles.orderPanelBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShowOrderPanel(false)}
+          />
+          <Animated.View style={[styles.orderPanelScroll, { backgroundColor: colors.bgCard, transform: [{ translateY: chartPanelTranslateY }] }]}>
+            {/* Swipe Handle */}
+            <View {...chartPanelPanResponder.panHandlers} style={{ paddingTop: 8, paddingBottom: 4, alignItems: 'center' }}>
+              <View style={[styles.orderPanelHandle, { backgroundColor: colors.border }]} />
             </View>
-
-            {/* Side Toggle */}
-            <View style={styles.sideToggle}>
-              <TouchableOpacity 
-                style={[styles.sideBtn, orderSide === 'SELL' && styles.sideBtnSell]}
-                onPress={() => setOrderSide('SELL')}
-              >
-                <Text style={styles.sideBtnText}>SELL</Text>
-                <Text style={styles.sideBtnPrice}>{currentPrice?.bid?.toFixed(decimals) || '-'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.sideBtn, orderSide === 'BUY' && styles.sideBtnBuy]}
-                onPress={() => setOrderSide('BUY')}
-              >
-                <Text style={styles.sideBtnText}>BUY</Text>
-                <Text style={styles.sideBtnPrice}>{currentPrice?.ask?.toFixed(decimals) || '-'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Volume */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Volume (Lots)</Text>
-              <View style={styles.volumeInput}>
-                <TouchableOpacity style={styles.volumeBtn} onPress={() => setVolume(Math.max(0.01, volume - 0.01))}>
-                  <Ionicons name="remove" size={20} color="#fff" />
-                </TouchableOpacity>
-                <Text style={styles.volumeValue}>{volume.toFixed(2)}</Text>
-                <TouchableOpacity style={styles.volumeBtn} onPress={() => setVolume(volume + 0.01)}>
-                  <Ionicons name="add" size={20} color="#fff" />
+            <ScrollView 
+              ref={chartOrderScrollRef}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+            <View style={[styles.orderPanelContainer, { backgroundColor: colors.bgCard }]}>
+              
+              {/* Header */}
+              <View style={styles.orderPanelHeaderRow}>
+                <View>
+                  <Text style={[styles.orderPanelSymbol, { color: colors.textPrimary }]}>{activeSymbol}</Text>
+                  <Text style={[styles.orderPanelName, { color: colors.textMuted }]}>{currentInstrument?.name}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowOrderPanel(false)} style={styles.orderCloseBtn}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* SL/TP for Challenge Accounts */}
-            {ctx.isChallengeMode && ctx.selectedChallengeAccount && (
-              <View style={styles.slTpRow}>
-                <View style={styles.slTpInputGroup}>
-                  <Text style={[styles.inputLabel, ctx.selectedChallengeAccount.challengeId?.rules?.stopLossMandatory && { color: '#f59e0b' }]}>
-                    Stop Loss {ctx.selectedChallengeAccount.challengeId?.rules?.stopLossMandatory ? '*' : ''}
+              {/* Leverage Display */}
+              <View style={[styles.leverageRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.leverageLabel, { color: colors.textMuted }]}>Leverage</Text>
+                <Text style={[styles.leverageValue, { color: colors.textPrimary }]}>{getAccountLeverage()}</Text>
+              </View>
+
+              {/* One-Click Buy/Sell */}
+              <View style={styles.quickTradeRow}>
+                <TouchableOpacity 
+                  style={[styles.quickSellBtn, isExecuting && styles.btnDisabled]}
+                  onPress={() => { 
+                    if (ctx.isChallengeMode && ctx.selectedChallengeAccount?.challengeId?.rules?.stopLossMandatory) {
+                      setPendingQuickTradeSide('SELL');
+                      setQuickSlValue('');
+                      setShowQuickSlModal(true);
+                    } else {
+                      setOrderSide('SELL'); 
+                      setOrderType('MARKET'); 
+                      executeTrade(); 
+                    }
+                  }}
+                  disabled={isExecuting}
+                >
+                  <Text style={styles.quickBtnLabel}>SELL</Text>
+                  <Text style={styles.quickBtnPrice}>
+                    {currentPrice?.bid?.toFixed(decimals) || '-'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.quickBuyBtn, isExecuting && styles.btnDisabled]}
+                  onPress={() => { 
+                    if (ctx.isChallengeMode && ctx.selectedChallengeAccount?.challengeId?.rules?.stopLossMandatory) {
+                      setPendingQuickTradeSide('BUY');
+                      setQuickSlValue('');
+                      setShowQuickSlModal(true);
+                    } else {
+                      setOrderSide('BUY'); 
+                      setOrderType('MARKET'); 
+                      executeTrade(); 
+                    }
+                  }}
+                  disabled={isExecuting}
+                >
+                  <Text style={styles.quickBtnLabel}>BUY</Text>
+                  <Text style={styles.quickBtnPrice}>
+                    {currentPrice?.ask?.toFixed(decimals) || '-'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Spread Info */}
+              <View style={styles.spreadInfoRow}>
+                <Text style={[styles.spreadInfoText, { color: colors.textMuted }]}>
+                  Spread: {currentPrice?.bid ? 
+                    ((currentPrice?.ask - currentPrice?.bid) * 
+                    (currentInstrument?.category === 'Forex' ? 10000 : 1)).toFixed(1) : '-'} pips
+                </Text>
+              </View>
+
+              {/* SL Mandatory Warning for Challenge Accounts */}
+              {ctx.isChallengeMode && ctx.selectedChallengeAccount?.challengeId?.rules?.stopLossMandatory && (
+                <View style={styles.slMandatoryBanner}>
+                  <Ionicons name="warning" size={16} color="#f59e0b" />
+                  <Text style={styles.slMandatoryText}>Stop Loss is mandatory for this challenge account</Text>
+                </View>
+              )}
+
+              {/* Order Type Toggle */}
+              <View style={styles.orderTypeRow}>
+                <TouchableOpacity 
+                  style={[styles.orderTypeBtn, { backgroundColor: colors.bgSecondary }, orderType === 'MARKET' && styles.orderTypeBtnActive]}
+                  onPress={() => setOrderType('MARKET')}
+                >
+                  <Text style={[styles.orderTypeBtnText, { color: colors.textMuted }, orderType === 'MARKET' && styles.orderTypeBtnTextActive]}>Market</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.orderTypeBtn, { backgroundColor: colors.bgSecondary }, orderType === 'PENDING' && styles.orderTypeBtnActive]}
+                  onPress={() => setOrderType('PENDING')}
+                >
+                  <Text style={[styles.orderTypeBtnText, { color: colors.textMuted }, orderType === 'PENDING' && styles.orderTypeBtnTextActive]}>Pending</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Pending Order Types */}
+              {orderType === 'PENDING' && (
+                <View style={styles.pendingTypeRow}>
+                  {['LIMIT', 'STOP'].map(type => (
+                    <TouchableOpacity 
+                      key={type}
+                      style={[styles.pendingTypeBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.border }, pendingType === type && styles.pendingTypeBtnActive]}
+                      onPress={() => setPendingType(type)}
+                    >
+                      <Text style={[styles.pendingTypeText, { color: colors.textMuted }, pendingType === type && styles.pendingTypeTextActive]}>
+                        {type === 'LIMIT' ? 'Limit' : 'Stop'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Pending Price Input */}
+              {orderType === 'PENDING' && (
+                <View style={styles.inputSection}>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                    {pendingType === 'LIMIT' ? 'Limit Price' : 'Stop Price'}
                   </Text>
                   <TextInput
-                    style={[styles.slTpInput, { backgroundColor: '#1a1a1a', color: '#fff', borderColor: '#333' }]}
-                    value={stopLoss}
-                    onChangeText={(text) => setStopLoss(text.replace(/[^0-9.]/g, ''))}
-                    placeholder="0.00"
-                    placeholderTextColor="#666"
-                    keyboardType="numbers-and-punctuation"
+                    style={[styles.priceInput, { backgroundColor: colors.bgSecondary, color: colors.textPrimary, borderColor: colors.border }]}
+                    value={pendingPrice}
+                    onChangeText={setPendingPrice}
+                    placeholder={currentPrice?.bid?.toFixed(2) || '0.00'}
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad"
                   />
                 </View>
-                <View style={styles.slTpInputGroup}>
-                  <Text style={styles.inputLabel}>Take Profit</Text>
+              )}
+
+              {/* Volume Control */}
+              <View style={styles.inputSection}>
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Volume (Lots)</Text>
+                <View style={styles.volumeControlRow}>
+                  <TouchableOpacity 
+                    style={[styles.volumeControlBtn, { backgroundColor: colors.accent }]} 
+                    onPress={() => {
+                      const newVol = Math.max(0.01, volume - 0.01);
+                      setVolume(newVol);
+                      setVolumeText(newVol.toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="remove" size={18} color="#fff" />
+                  </TouchableOpacity>
                   <TextInput
-                    style={[styles.slTpInput, { backgroundColor: '#1a1a1a', color: '#fff', borderColor: '#333' }]}
+                    style={[styles.volumeInputField, { backgroundColor: colors.bgSecondary, color: colors.textPrimary, borderColor: colors.border }]}
+                    value={volumeText}
+                    onChangeText={(text) => {
+                      if (text === '' || /^\d*\.?\d*$/.test(text)) {
+                        setVolumeText(text);
+                        const val = parseFloat(text);
+                        if (!isNaN(val) && val > 0) {
+                          setVolume(val);
+                        }
+                      }
+                    }}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        chartOrderScrollRef.current?.scrollTo({ y: 200, animated: true });
+                      }, 300);
+                    }}
+                    onBlur={() => {
+                      const val = parseFloat(volumeText);
+                      if (isNaN(val) || val <= 0) {
+                        setVolumeText('0.01');
+                        setVolume(0.01);
+                      } else {
+                        setVolume(val);
+                        setVolumeText(val.toFixed(2));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus={true}
+                  />
+                  <TouchableOpacity 
+                    style={[styles.volumeControlBtn, { backgroundColor: colors.accent }]} 
+                    onPress={() => {
+                      const newVol = volume + 0.01;
+                      setVolume(newVol);
+                      setVolumeText(newVol.toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="add" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Stop Loss & Take Profit */}
+              <View style={styles.slTpRow}>
+                <View style={styles.slTpCol}>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Stop Loss</Text>
+                  <TextInput
+                    style={[styles.slTpInputOrder, { backgroundColor: colors.bgSecondary, color: colors.textPrimary, borderColor: colors.border }]}
+                    value={stopLoss}
+                    onChangeText={(text) => setStopLoss(text.replace(/[^0-9.]/g, ''))}
+                    placeholder="Optional"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numbers-and-punctuation"
+                    selectionColor="#dc2626"
+                    onFocus={() => {
+                      setTimeout(() => {
+                        chartOrderScrollRef.current?.scrollToEnd({ animated: true });
+                      }, 300);
+                    }}
+                  />
+                </View>
+                <View style={styles.slTpCol}>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Take Profit</Text>
+                  <TextInput
+                    style={[styles.slTpInputOrder, { backgroundColor: colors.bgSecondary, color: colors.textPrimary, borderColor: colors.border }]}
                     value={takeProfit}
                     onChangeText={(text) => setTakeProfit(text.replace(/[^0-9.]/g, ''))}
-                    placeholder="0.00"
-                    placeholderTextColor="#666"
+                    placeholder="Optional"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numbers-and-punctuation"
+                    selectionColor="#dc2626"
+                    onFocus={() => {
+                      setTimeout(() => {
+                        chartOrderScrollRef.current?.scrollToEnd({ animated: true });
+                      }, 300);
+                    }}
                   />
                 </View>
               </View>
-            )}
 
-            {/* Execute Button */}
-            <TouchableOpacity 
-              style={[styles.executeBtn, { backgroundColor: orderSide === 'BUY' ? '#22c55e' : '#ef4444' }, isExecuting && { opacity: 0.6 }]}
-              onPress={executeTrade}
-              disabled={isExecuting}
-            >
-              {isExecuting ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.executeBtnText}>
-                  {orderSide} {volume.toFixed(2)} {activeSymbol}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+              {/* Final Buy/Sell Buttons */}
+              <View style={styles.finalTradeRow}>
+                <TouchableOpacity 
+                  style={[styles.finalSellBtn, isExecuting && styles.btnDisabled]}
+                  onPress={() => { setOrderSide('SELL'); executeTrade(); }}
+                  disabled={isExecuting}
+                >
+                  <Text style={styles.finalBtnText}>
+                    {isExecuting ? 'EXECUTING...' : orderType === 'PENDING' ? `SELL ${pendingType}` : 'SELL'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.finalBuyBtn, isExecuting && styles.btnDisabled]}
+                  onPress={() => { setOrderSide('BUY'); executeTrade(); }}
+                  disabled={isExecuting}
+                >
+                  <Text style={styles.finalBtnText}>
+                    {isExecuting ? 'EXECUTING...' : orderType === 'PENDING' ? `BUY ${pendingType}` : 'BUY'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Symbol Picker Modal - Add new chart */}
@@ -4687,9 +4952,9 @@ const styles = StyleSheet.create({
   // Order Panel - Slide from Bottom (Fixed - positioned at bottom)
   orderModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   orderPanelBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  orderPanelScroll: { maxHeight: height * 0.85 },
+  orderPanelScroll: { maxHeight: height * 0.85, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   orderPanelContainer: { backgroundColor: '#000000', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
-  orderPanelHandle: { width: 40, height: 4, backgroundColor: '#000000', borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 12 },
+  orderPanelHandle: { width: 40, height: 4, backgroundColor: '#555', borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 12 },
   orderPanelHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   orderPanelSymbol: { color: '#fff', fontSize: 16, fontWeight: '600' },
   orderPanelName: { color: '#666', fontSize: 12, marginTop: 2 },
@@ -4930,7 +5195,7 @@ const styles = StyleSheet.create({
   chartBtnLabel: { color: '#fff', fontSize: 12, fontWeight: '600', opacity: 0.9 },
   chartBtnPrice: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginTop: 2 },
   orderSlidePanel: { backgroundColor: '#000000', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
-  orderPanelHandle: { width: 40, height: 4, backgroundColor: '#000000', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  orderPanelHandle: { width: 40, height: 4, backgroundColor: '#555', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   symbolPickerModal: { backgroundColor: '#000000', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' },
   symbolPickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#000000' },
   symbolPickerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
