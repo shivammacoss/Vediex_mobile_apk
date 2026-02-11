@@ -52,6 +52,18 @@ const WalletScreen = ({ navigation }) => {
   });
   const [upiId, setUpiId] = useState('');
 
+  // Token Deposit/Withdraw states
+  const [showTokenDepositModal, setShowTokenDepositModal] = useState(false);
+  const [showTokenWithdrawModal, setShowTokenWithdrawModal] = useState(false);
+  const [tokenInrAmount, setTokenInrAmount] = useState('');
+  const [tokenUsdAmount, setTokenUsdAmount] = useState('');
+  const [exchangeRate, setExchangeRate] = useState(83);
+  const [loadingRate, setLoadingRate] = useState(false);
+  const [tokenSubmitting, setTokenSubmitting] = useState(false);
+  const [tokenError, setTokenError] = useState('');
+  const [tokenSuccess, setTokenSuccess] = useState('');
+  const TOKEN_MINIMUM_USD = 500;
+
   useEffect(() => {
     loadUser();
   }, []);
@@ -84,6 +96,138 @@ const WalletScreen = ({ navigation }) => {
     if (!currency || currency.currency === 'USD') return localAmt;
     const effectiveRate = currency.rateToUSD * (1 + (currency.markup || 0) / 100);
     return localAmt / effectiveRate;
+  };
+
+  // Fetch live exchange rate for token deposit/withdraw
+  const fetchExchangeRate = async () => {
+    setLoadingRate(true);
+    try {
+      const res = await fetch(`${API_URL}/prices/exchange-rate/usd-inr`);
+      const data = await res.json();
+      if (data.success && data.rate) {
+        setExchangeRate(data.rate);
+      }
+    } catch (error) {
+      console.error('Failed to fetch exchange rate:', error);
+    } finally {
+      setLoadingRate(false);
+    }
+  };
+
+  // Auto-calculate USD when INR changes for token
+  useEffect(() => {
+    if (tokenInrAmount && parseFloat(tokenInrAmount) > 0) {
+      const usd = parseFloat(tokenInrAmount) / exchangeRate;
+      setTokenUsdAmount(usd.toFixed(2));
+    } else {
+      setTokenUsdAmount('');
+    }
+  }, [tokenInrAmount, exchangeRate]);
+
+  // Handle Token Deposit
+  const handleTokenDeposit = async () => {
+    const usd = parseFloat(tokenUsdAmount);
+    if (!tokenInrAmount || parseFloat(tokenInrAmount) <= 0) {
+      setTokenError('Please enter a valid amount');
+      return;
+    }
+    if (usd < TOKEN_MINIMUM_USD) {
+      setTokenError(`Minimum deposit is $${TOKEN_MINIMUM_USD} USD`);
+      return;
+    }
+
+    setTokenSubmitting(true);
+    setTokenError('');
+    try {
+      const res = await fetch(`${API_URL}/wallet/deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id,
+          amount: usd,
+          localAmount: parseFloat(tokenInrAmount),
+          currency: 'INR',
+          currencySymbol: '₹',
+          exchangeRate: exchangeRate,
+          paymentMethod: 'Token',
+          transactionRef: ''
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTokenSuccess('Token deposit request submitted successfully!');
+        setTimeout(() => {
+          setShowTokenDepositModal(false);
+          setTokenInrAmount('');
+          setTokenUsdAmount('');
+          setTokenError('');
+          setTokenSuccess('');
+          fetchWalletData();
+        }, 2000);
+      } else {
+        setTokenError(data.message || 'Failed to submit deposit request');
+      }
+    } catch (error) {
+      setTokenError('Error submitting deposit request');
+    } finally {
+      setTokenSubmitting(false);
+    }
+  };
+
+  // Handle Token Withdraw
+  const handleTokenWithdraw = async () => {
+    const usd = parseFloat(tokenUsdAmount);
+    if (!tokenInrAmount || parseFloat(tokenInrAmount) <= 0) {
+      setTokenError('Please enter a valid amount');
+      return;
+    }
+    if (usd < TOKEN_MINIMUM_USD) {
+      setTokenError(`Minimum withdrawal is $${TOKEN_MINIMUM_USD} USD`);
+      return;
+    }
+    if (usd > (wallet?.balance || 0)) {
+      setTokenError(`Insufficient balance. Available: $${(wallet?.balance || 0).toFixed(2)}`);
+      return;
+    }
+
+    setTokenSubmitting(true);
+    setTokenError('');
+    try {
+      const res = await fetch(`${API_URL}/wallet/withdraw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id,
+          amount: usd,
+          localAmount: parseFloat(tokenInrAmount),
+          currency: 'INR',
+          exchangeRate: exchangeRate,
+          withdrawMethod: 'Token',
+          walletAddress: '',
+          network: '',
+          note: '',
+          twoFACode: null
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTokenSuccess('Token withdrawal request submitted successfully!');
+        setTimeout(() => {
+          setShowTokenWithdrawModal(false);
+          setTokenInrAmount('');
+          setTokenUsdAmount('');
+          setTokenError('');
+          setTokenSuccess('');
+          fetchWalletData();
+        }, 2000);
+      } else {
+        setTokenError(data.message || 'Failed to submit withdrawal request');
+      }
+    } catch (error) {
+      setTokenError('Error submitting withdrawal request');
+    } finally {
+      setTokenSubmitting(false);
+    }
   };
 
   const loadUser = async () => {
@@ -374,6 +518,16 @@ const WalletScreen = ({ navigation }) => {
             <TouchableOpacity style={[styles.withdrawBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.accent }]} onPress={() => setShowWithdrawModal(true)}>
               <Ionicons name="arrow-up-circle" size={20} color={colors.accent} />
               <Text style={[styles.withdrawBtnText, { color: colors.accent }]}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.actionButtons, { marginTop: 10 }]}>
+            <TouchableOpacity style={[styles.depositBtn, { backgroundColor: '#8b5cf6' }]} onPress={() => { fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenDepositModal(true); }}>
+              <Ionicons name="logo-bitcoin" size={20} color="#fff" />
+              <Text style={[styles.depositBtnText, { color: '#fff' }]}>Token Deposit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.withdrawBtn, { backgroundColor: colors.bgSecondary, borderColor: '#8b5cf6' }]} onPress={() => { fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenWithdrawModal(true); }}>
+              <Ionicons name="logo-bitcoin" size={20} color="#8b5cf6" />
+              <Text style={[styles.withdrawBtnText, { color: '#8b5cf6' }]}>Token Withdraw</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -782,6 +936,194 @@ const WalletScreen = ({ navigation }) => {
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Token Deposit Modal */}
+      <Modal visible={showTokenDepositModal} animationType="slide" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <SafeAreaView style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View style={[styles.modalContent, { backgroundColor: colors.bgCard, maxHeight: '85%' }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#8b5cf620', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="logo-bitcoin" size={20} color="#8b5cf6" />
+                  </View>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Token Deposit</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Balance: ${wallet.balance?.toFixed(2) || '0.00'}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setShowTokenDepositModal(false)} style={{ padding: 4 }}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {/* Minimum Note */}
+                <View style={{ backgroundColor: '#f59e0b20', borderWidth: 1, borderColor: '#f59e0b40', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                  <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Note: Minimum 500 USD</Text>
+                </View>
+
+                {/* Error/Success */}
+                {tokenError ? (
+                  <View style={{ backgroundColor: '#ef444415', borderWidth: 1, borderColor: '#ef444440', borderRadius: 10, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                    <Text style={{ color: '#ef4444', fontSize: 13, flex: 1 }}>{tokenError}</Text>
+                  </View>
+                ) : null}
+                {tokenSuccess ? (
+                  <View style={{ backgroundColor: '#22c55e15', borderWidth: 1, borderColor: '#22c55e40', borderRadius: 10, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                    <Text style={{ color: '#22c55e', fontSize: 13, flex: 1 }}>{tokenSuccess}</Text>
+                  </View>
+                ) : null}
+
+                {/* Amount INR */}
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Amount (INR) *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.bgSecondary, marginBottom: 12, paddingHorizontal: 14 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 16, marginRight: 8 }}>₹</Text>
+                  <TextInput
+                    style={{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 14 }}
+                    value={tokenInrAmount}
+                    onChangeText={(t) => { setTokenInrAmount(t.replace(/[^0-9.]/g, '')); setTokenError(''); }}
+                    placeholder="Enter amount in INR"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Amount USD - Auto Calculated */}
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Amount (USD) - Auto Calculated</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.bgSecondary, marginBottom: 8, paddingHorizontal: 14 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 16, marginRight: 8 }}>$</Text>
+                  <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 14 }}>{tokenUsdAmount || '0.00'}</Text>
+                  <TouchableOpacity onPress={fetchExchangeRate}>
+                    <Ionicons name="refresh" size={18} color={loadingRate ? colors.textMuted : colors.accent} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Exchange Rate */}
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
+                  Exchange Rate: 1 USD = ₹{exchangeRate.toFixed(2)}
+                </Text>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: '#8b5cf6' }, (tokenSubmitting || !tokenInrAmount) && styles.submitBtnDisabled]}
+                  onPress={handleTokenDeposit}
+                  disabled={tokenSubmitting || !tokenInrAmount}
+                >
+                  {tokenSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={[styles.submitBtnText, { color: '#fff' }]}>Submit Deposit Request</Text>}
+                </TouchableOpacity>
+
+                {/* Contact Telegram */}
+                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="send" size={18} color="#0088cc" />
+                  <Text style={{ color: '#0088cc', fontSize: 14, fontWeight: '600' }}>Contact on Telegram</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Token Withdraw Modal */}
+      <Modal visible={showTokenWithdrawModal} animationType="slide" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <SafeAreaView style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View style={[styles.modalContent, { backgroundColor: colors.bgCard, maxHeight: '85%' }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#8b5cf620', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="logo-bitcoin" size={20} color="#8b5cf6" />
+                  </View>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Token Withdrawal</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Balance: ${wallet.balance?.toFixed(2) || '0.00'}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setShowTokenWithdrawModal(false)} style={{ padding: 4 }}>
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {/* Minimum Note */}
+                <View style={{ backgroundColor: '#f59e0b20', borderWidth: 1, borderColor: '#f59e0b40', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                  <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '600' }}>Note: Minimum 500 USD</Text>
+                </View>
+
+                {/* Available Balance */}
+                <View style={[styles.availableBalance, { backgroundColor: colors.bgSecondary, borderColor: colors.border, marginBottom: 16 }]}>
+                  <Text style={[styles.availableLabel, { color: colors.textMuted }]}>Available Balance</Text>
+                  <Text style={[styles.availableAmount, { color: '#8b5cf6' }]}>${wallet.balance?.toFixed(2) || '0.00'}</Text>
+                </View>
+
+                {/* Error/Success */}
+                {tokenError ? (
+                  <View style={{ backgroundColor: '#ef444415', borderWidth: 1, borderColor: '#ef444440', borderRadius: 10, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                    <Text style={{ color: '#ef4444', fontSize: 13, flex: 1 }}>{tokenError}</Text>
+                  </View>
+                ) : null}
+                {tokenSuccess ? (
+                  <View style={{ backgroundColor: '#22c55e15', borderWidth: 1, borderColor: '#22c55e40', borderRadius: 10, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                    <Text style={{ color: '#22c55e', fontSize: 13, flex: 1 }}>{tokenSuccess}</Text>
+                  </View>
+                ) : null}
+
+                {/* Amount INR */}
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Amount (INR) *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.bgSecondary, marginBottom: 12, paddingHorizontal: 14 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 16, marginRight: 8 }}>₹</Text>
+                  <TextInput
+                    style={{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 14 }}
+                    value={tokenInrAmount}
+                    onChangeText={(t) => { setTokenInrAmount(t.replace(/[^0-9.]/g, '')); setTokenError(''); }}
+                    placeholder="Enter amount in INR"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* Amount USD - Auto Calculated */}
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Amount (USD) - Auto Calculated</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.bgSecondary, marginBottom: 8, paddingHorizontal: 14 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 16, marginRight: 8 }}>$</Text>
+                  <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 15, paddingVertical: 14 }}>{tokenUsdAmount || '0.00'}</Text>
+                  <TouchableOpacity onPress={fetchExchangeRate}>
+                    <Ionicons name="refresh" size={18} color={loadingRate ? colors.textMuted : colors.accent} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Exchange Rate */}
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 16 }}>
+                  Exchange Rate: 1 USD = ₹{exchangeRate.toFixed(2)}
+                </Text>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: '#8b5cf6' }, (tokenSubmitting || !tokenInrAmount) && styles.submitBtnDisabled]}
+                  onPress={handleTokenWithdraw}
+                  disabled={tokenSubmitting || !tokenInrAmount}
+                >
+                  {tokenSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={[styles.submitBtnText, { color: '#fff' }]}>Submit Withdrawal Request</Text>}
+                </TouchableOpacity>
+
+                {/* Contact Telegram */}
+                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="send" size={18} color="#0088cc" />
+                  <Text style={{ color: '#0088cc', fontSize: 14, fontWeight: '600' }}>Contact on Telegram</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -2538,6 +2538,15 @@ const TradeTab = () => {
   // History filter states
   const [historyFilter, setHistoryFilter] = useState('all');
 
+  // Close Trade Modal states
+  const [showCloseTradeModal, setShowCloseTradeModal] = useState(false);
+  const [closeTradeData, setCloseTradeData] = useState(null);
+  const [closeTradeTab, setCloseTradeTab] = useState('partial'); // 'partial', 'full', 'modify'
+  const [closeLotSize, setCloseLotSize] = useState('');
+  const [closeTradeLoading, setCloseTradeLoading] = useState(false);
+  const [closeTradeError, setCloseTradeError] = useState('');
+  const [closeTradeSuccess, setCloseTradeSuccess] = useState('');
+
   const totalUsedMargin = ctx.openTrades.reduce((sum, trade) => sum + (trade.marginUsed || 0), 0);
   
   // Filter trade history based on selected filter
@@ -2615,6 +2624,161 @@ const TradeTab = () => {
       toast?.showToast('Failed to close trade', 'error');
     } finally {
       setClosingTradeId(null);
+    }
+  };
+
+  // Open Close Trade Modal (Partial/Full/Modify)
+  const openCloseTradeModal = (trade) => {
+    setCloseTradeData(trade);
+    setCloseTradeTab('partial');
+    setCloseLotSize('');
+    setCloseTradeError('');
+    setCloseTradeSuccess('');
+    setShowCloseTradeModal(true);
+  };
+
+  // Calculate PnL for close trade modal
+  const calculateClosePnl = (trade, lots = null) => {
+    if (!trade) return 0;
+    const prices = ctx.livePrices[trade.symbol];
+    if (!prices?.bid || !prices?.ask) return 0;
+    const quantity = lots || trade.quantity;
+    const contractSize = trade.contractSize || 100000;
+    const exitPrice = trade.side === 'BUY' ? prices.bid : prices.ask;
+    return trade.side === 'BUY'
+      ? (exitPrice - trade.openPrice) * quantity * contractSize
+      : (trade.openPrice - exitPrice) * quantity * contractSize;
+  };
+
+  // Handle Partial Close
+  const handlePartialClose = async () => {
+    if (!closeLotSize || parseFloat(closeLotSize) <= 0) {
+      setCloseTradeError('Please enter a valid lot size');
+      return;
+    }
+    if (parseFloat(closeLotSize) >= closeTradeData.quantity) {
+      setCloseTradeError('Use Full Close for entire position');
+      return;
+    }
+    const prices = ctx.livePrices[closeTradeData.symbol];
+    if (!prices?.bid || !prices?.ask) {
+      setCloseTradeError('No price data available');
+      return;
+    }
+
+    setCloseTradeLoading(true);
+    setCloseTradeError('');
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const res = await fetch(`${API_URL}/trade/partial-close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          tradeId: closeTradeData._id,
+          closeLot: parseFloat(closeLotSize),
+          bid: prices.bid,
+          ask: prices.ask
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCloseTradeSuccess(`Closed ${closeLotSize} lots successfully`);
+        ctx.fetchOpenTrades();
+        ctx.fetchTradeHistory();
+        ctx.fetchAccountSummary();
+        setTimeout(() => setShowCloseTradeModal(false), 1500);
+      } else {
+        setCloseTradeError(data.message || 'Failed to partial close');
+      }
+    } catch (e) {
+      setCloseTradeError('Network error');
+    } finally {
+      setCloseTradeLoading(false);
+    }
+  };
+
+  // Handle Full Close
+  const handleFullClose = async () => {
+    const prices = ctx.livePrices[closeTradeData.symbol];
+    if (!prices?.bid || !prices?.ask) {
+      setCloseTradeError('No price data available');
+      return;
+    }
+
+    setCloseTradeLoading(true);
+    setCloseTradeError('');
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const res = await fetch(`${API_URL}/trade/full-close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          tradeId: closeTradeData._id,
+          bid: prices.bid,
+          ask: prices.ask
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCloseTradeSuccess('Trade closed successfully');
+        ctx.fetchOpenTrades();
+        ctx.fetchTradeHistory();
+        ctx.fetchAccountSummary();
+        setTimeout(() => setShowCloseTradeModal(false), 1500);
+      } else {
+        setCloseTradeError(data.message || 'Failed to close trade');
+      }
+    } catch (e) {
+      setCloseTradeError('Network error');
+    } finally {
+      setCloseTradeLoading(false);
+    }
+  };
+
+  // Handle Modify (reduce position)
+  const handleModifyLot = async () => {
+    if (!closeLotSize || parseFloat(closeLotSize) <= 0) {
+      setCloseTradeError('Please enter lot size to reduce');
+      return;
+    }
+    if (parseFloat(closeLotSize) >= closeTradeData.quantity) {
+      setCloseTradeError('Cannot reduce to zero or negative');
+      return;
+    }
+    const prices = ctx.livePrices[closeTradeData.symbol];
+    if (!prices?.bid || !prices?.ask) {
+      setCloseTradeError('No price data available');
+      return;
+    }
+
+    setCloseTradeLoading(true);
+    setCloseTradeError('');
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const res = await fetch(`${API_URL}/trade/partial-close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          tradeId: closeTradeData._id,
+          closeLot: parseFloat(closeLotSize),
+          bid: prices.bid,
+          ask: prices.ask
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCloseTradeSuccess(`Reduced position by ${closeLotSize} lots`);
+        ctx.fetchOpenTrades();
+        ctx.fetchTradeHistory();
+        ctx.fetchAccountSummary();
+        setTimeout(() => setShowCloseTradeModal(false), 1500);
+      } else {
+        setCloseTradeError(data.message || 'Failed to modify trade');
+      }
+    } catch (e) {
+      setCloseTradeError('Network error');
+    } finally {
+      setCloseTradeLoading(false);
     }
   };
 
@@ -2902,6 +3066,9 @@ const TradeTab = () => {
                       <View style={styles.positionActions}>
                         <TouchableOpacity style={styles.editBtn} onPress={(e) => { e.stopPropagation(); openSlTpModal(trade); }}>
                           <Ionicons name="pencil" size={16} color={colors.accent} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.editBtn, { backgroundColor: '#3b82f620' }]} onPress={(e) => { e.stopPropagation(); openCloseTradeModal(trade); }}>
+                          <Ionicons name="close-circle-outline" size={16} color="#3b82f6" />
                         </TouchableOpacity>
                       </View>
                       <View style={styles.positionPnlCol}>
@@ -3450,6 +3617,192 @@ const TradeTab = () => {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* Close Trade Modal (Partial Close / Full Close / Modify) */}
+      <Modal visible={showCloseTradeModal} animationType="slide" transparent onRequestClose={() => setShowCloseTradeModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.slTpModalOverlay}>
+          <TouchableOpacity style={styles.slTpModalBackdrop} activeOpacity={1} onPress={() => setShowCloseTradeModal(false)} />
+          <View style={[styles.closeTradeModalContent, { backgroundColor: colors.bgCard }]}>
+            <View style={[styles.slTpModalHandle, { backgroundColor: colors.border }]} />
+            
+            {/* Header */}
+            <View style={styles.closeTradeHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[styles.closeTradeIcon, { backgroundColor: closeTradeData?.side === 'BUY' ? '#22c55e20' : '#ef444420' }]}>
+                  <Ionicons name={closeTradeData?.side === 'BUY' ? 'trending-up' : 'trending-down'} size={20} color={closeTradeData?.side === 'BUY' ? '#22c55e' : '#ef4444'} />
+                </View>
+                <View>
+                  <Text style={[styles.closeTradeSymbol, { color: colors.textPrimary }]}>{closeTradeData?.symbol}</Text>
+                  <Text style={[styles.closeTradeInfo, { color: colors.textMuted }]}>{closeTradeData?.side} • {closeTradeData?.quantity} lots</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCloseTradeModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Trade Info Row */}
+            <View style={[styles.closeTradeInfoRow, { backgroundColor: colors.bgSecondary }]}>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={[styles.closeTradeInfoLabel, { color: colors.textMuted }]}>Entry Price</Text>
+                <Text style={[styles.closeTradeInfoValue, { color: colors.textPrimary }]}>{closeTradeData?.openPrice?.toFixed(5)}</Text>
+              </View>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={[styles.closeTradeInfoLabel, { color: colors.textMuted }]}>Current Price</Text>
+                <Text style={[styles.closeTradeInfoValue, { color: colors.textPrimary }]}>
+                  {closeTradeData ? (closeTradeData.side === 'BUY' ? ctx.livePrices[closeTradeData.symbol]?.bid : ctx.livePrices[closeTradeData.symbol]?.ask)?.toFixed(5) || '-' : '-'}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={[styles.closeTradeInfoLabel, { color: colors.textMuted }]}>Live P/L</Text>
+                <Text style={[styles.closeTradeInfoValue, { color: closeTradeData ? (calculateClosePnl(closeTradeData) >= 0 ? '#22c55e' : '#ef4444') : colors.textPrimary, fontWeight: '700' }]}>
+                  {closeTradeData ? `${calculateClosePnl(closeTradeData) >= 0 ? '+' : ''}${calculateClosePnl(closeTradeData).toFixed(2)}` : '-'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Tabs */}
+            <View style={styles.closeTradeTabRow}>
+              {[
+                { key: 'partial', label: 'Partial Close', color: '#3b82f6' },
+                { key: 'full', label: 'Full Close', color: '#ef4444' },
+                { key: 'modify', label: 'Modify', color: '#eab308' },
+              ].map(tab => (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.closeTradeTabBtn, closeTradeTab === tab.key && { borderBottomColor: tab.color, borderBottomWidth: 2 }]}
+                  onPress={() => { setCloseTradeTab(tab.key); setCloseTradeError(''); setCloseTradeSuccess(''); setCloseLotSize(''); }}
+                >
+                  <Text style={[styles.closeTradeTabText, { color: closeTradeTab === tab.key ? tab.color : colors.textMuted }]}>{tab.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <ScrollView style={{ paddingHorizontal: 16, paddingTop: 12 }} keyboardShouldPersistTaps="handled">
+              {/* Error/Success */}
+              {closeTradeError ? (
+                <View style={styles.closeTradeAlert}>
+                  <Ionicons name="alert-circle" size={16} color="#ef4444" />
+                  <Text style={styles.closeTradeAlertText}>{closeTradeError}</Text>
+                </View>
+              ) : null}
+              {closeTradeSuccess ? (
+                <View style={[styles.closeTradeAlert, { backgroundColor: '#22c55e15', borderColor: '#22c55e40' }]}>
+                  <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                  <Text style={[styles.closeTradeAlertText, { color: '#22c55e' }]}>{closeTradeSuccess}</Text>
+                </View>
+              ) : null}
+
+              {/* Partial Close Tab */}
+              {closeTradeTab === 'partial' && closeTradeData && (
+                <View>
+                  <Text style={[styles.closeTradeLabel, { color: colors.textMuted }]}>Lots to Close (Max: {closeTradeData.quantity})</Text>
+                  <TextInput
+                    style={[styles.closeTradeInput, { backgroundColor: colors.bgSecondary, borderColor: colors.border, color: colors.textPrimary }]}
+                    value={closeLotSize}
+                    onChangeText={(t) => { setCloseLotSize(t.replace(/[^0-9.]/g, '')); setCloseTradeError(''); }}
+                    placeholder="Enter lot size"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+                  <View style={styles.quickLotRow}>
+                    {[25, 50, 75].map(pct => (
+                      <TouchableOpacity key={pct} style={[styles.quickLotBtn, { backgroundColor: colors.bgSecondary }]} onPress={() => setCloseLotSize((closeTradeData.quantity * pct / 100).toFixed(2))}>
+                        <Text style={[styles.quickLotText, { color: colors.textPrimary }]}>{pct}%</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {closeLotSize && parseFloat(closeLotSize) > 0 && (
+                    <View style={[styles.closeTradePreview, { backgroundColor: colors.bgSecondary }]}>
+                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>Est. P/L for {closeLotSize} lots</Text>
+                      <Text style={{ color: calculateClosePnl(closeTradeData, parseFloat(closeLotSize)) >= 0 ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
+                        {calculateClosePnl(closeTradeData, parseFloat(closeLotSize)) >= 0 ? '+' : ''}${calculateClosePnl(closeTradeData, parseFloat(closeLotSize)).toFixed(2)}
+                      </Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.closeTradeActionBtn, { backgroundColor: '#3b82f6' }, (closeTradeLoading || !closeLotSize) && { opacity: 0.5 }]}
+                    onPress={handlePartialClose}
+                    disabled={closeTradeLoading || !closeLotSize}
+                  >
+                    {closeTradeLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.closeTradeActionText}>Partial Close</Text>}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Full Close Tab */}
+              {closeTradeTab === 'full' && closeTradeData && (
+                <View>
+                  <View style={[styles.closeTradeFullInfo, { backgroundColor: colors.bgSecondary }]}>
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>You are about to close</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: 24, fontWeight: '700', marginVertical: 6 }}>{closeTradeData.quantity} lots</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>This action cannot be undone</Text>
+                  </View>
+                  <View style={[styles.closeTradePreview, { backgroundColor: colors.bgSecondary }]}>
+                    <Text style={{ color: colors.textMuted, fontSize: 13 }}>Total P/L</Text>
+                    <Text style={{ color: calculateClosePnl(closeTradeData) >= 0 ? '#22c55e' : '#ef4444', fontWeight: '700', fontSize: 18 }}>
+                      {calculateClosePnl(closeTradeData) >= 0 ? '+' : ''}${calculateClosePnl(closeTradeData).toFixed(2)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.closeTradeActionBtn, { backgroundColor: '#ef4444' }, closeTradeLoading && { opacity: 0.5 }]}
+                    onPress={handleFullClose}
+                    disabled={closeTradeLoading}
+                  >
+                    {closeTradeLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.closeTradeActionText}>Close Trade</Text>}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Modify Tab */}
+              {closeTradeTab === 'modify' && closeTradeData && (
+                <View>
+                  <View style={[styles.closeTradeAlert, { backgroundColor: '#eab30815', borderColor: '#eab30840' }]}>
+                    <Ionicons name="information-circle" size={16} color="#eab308" />
+                    <Text style={[styles.closeTradeAlertText, { color: '#eab308' }]}>Reduce your position size. The reduced portion will be closed at market price.</Text>
+                  </View>
+                  <Text style={[styles.closeTradeLabel, { color: colors.textMuted }]}>Lots to Reduce (Current: {closeTradeData.quantity})</Text>
+                  <TextInput
+                    style={[styles.closeTradeInput, { backgroundColor: colors.bgSecondary, borderColor: colors.border, color: colors.textPrimary }]}
+                    value={closeLotSize}
+                    onChangeText={(t) => { setCloseLotSize(t.replace(/[^0-9.]/g, '')); setCloseTradeError(''); }}
+                    placeholder="Enter lot size to reduce"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+                  {closeLotSize && parseFloat(closeLotSize) > 0 && (
+                    <View style={[styles.closeTradePreview, { backgroundColor: colors.bgSecondary }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>New Position Size</Text>
+                        <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>{(closeTradeData.quantity - parseFloat(closeLotSize)).toFixed(2)} lots</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>P/L for Reduced Portion</Text>
+                        <Text style={{ color: calculateClosePnl(closeTradeData, parseFloat(closeLotSize)) >= 0 ? '#22c55e' : '#ef4444', fontWeight: '700' }}>
+                          {calculateClosePnl(closeTradeData, parseFloat(closeLotSize)) >= 0 ? '+' : ''}${calculateClosePnl(closeTradeData, parseFloat(closeLotSize)).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.closeTradeActionBtn, { backgroundColor: '#eab308' }, (closeTradeLoading || !closeLotSize) && { opacity: 0.5 }]}
+                    onPress={handleModifyLot}
+                    disabled={closeTradeLoading || !closeLotSize}
+                  >
+                    {closeTradeLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.closeTradeActionText}>Reduce Position</Text>}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Cancel Button */}
+              <TouchableOpacity style={styles.closeTradeCancel} onPress={() => setShowCloseTradeModal(false)}>
+                <Text style={{ color: colors.textMuted, fontSize: 14 }}>Cancel</Text>
+              </TouchableOpacity>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
     </View>
@@ -5189,6 +5542,31 @@ const styles = StyleSheet.create({
   // Cancel Order Button
   cancelOrderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#dc262620', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#dc2626' },
   cancelOrderText: { color: '#dc2626', fontSize: 12, fontWeight: '600' },
+
+  // Close Trade Modal
+  closeTradeModalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
+  closeTradeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#333' },
+  closeTradeIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  closeTradeSymbol: { fontSize: 16, fontWeight: '700' },
+  closeTradeInfo: { fontSize: 13 },
+  closeTradeInfoRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16 },
+  closeTradeInfoLabel: { fontSize: 11, marginBottom: 4 },
+  closeTradeInfoValue: { fontSize: 14, fontWeight: '600' },
+  closeTradeTabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#333' },
+  closeTradeTabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  closeTradeTabText: { fontSize: 13, fontWeight: '600' },
+  closeTradeLabel: { fontSize: 13, marginBottom: 8 },
+  closeTradeInput: { borderRadius: 10, padding: 14, fontSize: 15, borderWidth: 1, marginBottom: 12 },
+  quickLotRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  quickLotBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  quickLotText: { fontSize: 13, fontWeight: '600' },
+  closeTradePreview: { padding: 12, borderRadius: 10, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  closeTradeActionBtn: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: 8 },
+  closeTradeActionText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  closeTradeFullInfo: { padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 12 },
+  closeTradeAlert: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, backgroundColor: '#ef444415', borderWidth: 1, borderColor: '#ef444440', marginBottom: 12 },
+  closeTradeAlertText: { color: '#ef4444', fontSize: 13, flex: 1 },
+  closeTradeCancel: { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#333', marginTop: 4 },
   
   // Swipe to Close
   swipeCloseBtn: { backgroundColor: '#dc2626', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
