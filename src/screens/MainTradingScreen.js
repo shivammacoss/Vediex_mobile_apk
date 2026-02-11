@@ -1585,6 +1585,7 @@ const HomeTab = ({ navigation }) => {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             scrollEnabled={true}
+            nestedScrollEnabled={true}
           />
         </View>
       </View>
@@ -1638,6 +1639,7 @@ const HomeTab = ({ navigation }) => {
               javaScriptEnabled={true}
               domStorageEnabled={true}
               scrollEnabled={true}
+              nestedScrollEnabled={true}
             />
           ) : (
             <WebView
@@ -1667,6 +1669,7 @@ const HomeTab = ({ navigation }) => {
               javaScriptEnabled={true}
               domStorageEnabled={true}
               scrollEnabled={true}
+              nestedScrollEnabled={true}
             />
           )}
         </View>
