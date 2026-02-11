@@ -523,11 +523,11 @@ const WalletScreen = ({ navigation }) => {
           </View>
           <View style={[styles.actionButtons, { marginTop: 10 }]}>
             <TouchableOpacity style={[styles.depositBtn, { backgroundColor: '#8b5cf6' }]} onPress={() => { fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenDepositModal(true); }}>
-              <Ionicons name="logo-bitcoin" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', marginRight: 2 }}>₹</Text>
               <Text style={[styles.depositBtnText, { color: '#fff' }]}>Token Deposit</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.withdrawBtn, { backgroundColor: colors.bgSecondary, borderColor: '#8b5cf6' }]} onPress={() => { fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenWithdrawModal(true); }}>
-              <Ionicons name="logo-bitcoin" size={20} color="#8b5cf6" />
+              <Text style={{ color: '#8b5cf6', fontSize: 18, fontWeight: '700', marginRight: 2 }}>₹</Text>
               <Text style={[styles.withdrawBtnText, { color: '#8b5cf6' }]}>Token Withdraw</Text>
             </TouchableOpacity>
           </View>
