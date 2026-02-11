@@ -13,6 +13,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -685,7 +686,7 @@ const WalletScreen = ({ navigation }) => {
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodsScroll}>
-                {paymentMethods.map((method) => (
+                {paymentMethods.filter(m => (m.type || m.name) !== 'Token').map((method) => (
                   <TouchableOpacity
                     key={method._id}
                     style={[styles.methodCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }, selectedMethod?._id === method._id && styles.methodCardActive]}
@@ -696,6 +697,12 @@ const WalletScreen = ({ navigation }) => {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  style={[styles.methodCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                  onPress={() => { setShowDepositModal(false); fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenDepositModal(true); }}
+                >
+                  <Text style={[styles.methodName, { color: colors.textPrimary }]}>Token</Text>
+                </TouchableOpacity>
               </ScrollView>
             )}
 
@@ -850,7 +857,7 @@ const WalletScreen = ({ navigation }) => {
 
             <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Payment Method</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.methodsScroll}>
-              {paymentMethods.filter(m => m.type !== 'QR Code').map((method) => (
+              {paymentMethods.filter(m => m.type !== 'QR Code' && (m.type || m.name) !== 'Token').map((method) => (
                 <TouchableOpacity
                   key={method._id}
                   style={[styles.methodCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }, selectedMethod?._id === method._id && styles.methodCardActive]}
@@ -861,6 +868,12 @@ const WalletScreen = ({ navigation }) => {
                   </Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity
+                style={[styles.methodCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                onPress={() => { setShowWithdrawModal(false); fetchExchangeRate(); setTokenInrAmount(''); setTokenUsdAmount(''); setTokenError(''); setTokenSuccess(''); setShowTokenWithdrawModal(true); }}
+              >
+                <Text style={[styles.methodName, { color: colors.textPrimary }]}>Token</Text>
+              </TouchableOpacity>
             </ScrollView>
 
             {/* Bank Transfer Input Fields */}
@@ -1017,7 +1030,7 @@ const WalletScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 {/* Contact Telegram */}
-                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }} onPress={() => Linking.openURL('https://t.me/rajeshkummarr')}>
                   <Ionicons name="send" size={18} color="#0088cc" />
                   <Text style={{ color: '#0088cc', fontSize: 14, fontWeight: '600' }}>Contact on Telegram</Text>
                 </TouchableOpacity>
@@ -1114,7 +1127,7 @@ const WalletScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 {/* Contact Telegram */}
-                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity style={{ marginTop: 12, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: '#0088cc40', backgroundColor: '#0088cc10', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }} onPress={() => Linking.openURL('https://t.me/rajeshkummarr')}>
                   <Ionicons name="send" size={18} color="#0088cc" />
                   <Text style={{ color: '#0088cc', fontSize: 14, fontWeight: '600' }}>Contact on Telegram</Text>
                 </TouchableOpacity>
