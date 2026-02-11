@@ -1507,94 +1507,164 @@ const HomeTab = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* MarketWatch News */}
-      <View style={styles.marketWatchSection}>
-        <View style={styles.marketWatchHeader}>
-          <View style={styles.marketWatchTitleRow}>
-            <Ionicons name="newspaper-outline" size={20} color={colors.primary} />
-            <Text style={[styles.marketWatchTitle, { color: colors.textPrimary }]}>MarketWatch News</Text>
+      {/* Forex Heatmap - TradingView Widget */}
+      <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
+        <View style={styles.tvWidgetHeader}>
+          <View style={styles.tvWidgetTitleRow}>
+            <Ionicons name="grid-outline" size={20} color="#f97316" />
+            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Forex Heatmap</Text>
           </View>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
-          </View>
+          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Currency strength visualization</Text>
         </View>
-        
-        {/* News Cards - Vertical */}
-        <View style={styles.newsCardsVertical}>
-          {[
-            {
-              id: 1,
-              category: 'Markets',
-              title: 'Fed signals potential rate cuts amid cooling inflation data',
-              description: 'Federal Reserve officials hint at possible monetary policy easing as inflation shows signs of moderating...',
-              time: '5m ago',
-              image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400',
-            },
-            {
-              id: 2,
-              category: 'Crypto',
-              title: 'Bitcoin surges past key resistance as institutional buying accelerates',
-              description: 'Major cryptocurrency rallies as large investors increase positions ahead of halving event...',
-              time: '12m ago',
-              image: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=400',
-            },
-            {
-              id: 3,
-              category: 'Forex',
-              title: 'EUR/USD volatility spikes on ECB policy divergence',
-              description: 'Euro faces pressure as European Central Bank maintains hawkish stance while Fed pivots...',
-              time: '28m ago',
-              image: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400',
-            },
-            {
-              id: 4,
-              category: 'Commodities',
-              title: 'Gold hits new highs as safe-haven demand increases',
-              description: 'Precious metal reaches record levels amid geopolitical tensions and dollar weakness...',
-              time: '45m ago',
-              image: 'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=400',
-            },
-            {
-              id: 5,
-              category: 'Markets',
-              title: 'Tech stocks lead market rally on strong earnings',
-              description: 'Major indices climb as technology sector reports better-than-expected quarterly results...',
-              time: '1h ago',
-              image: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=400',
-            },
-          ].map((news) => (
-            <TouchableOpacity 
-              key={news.id}
-              style={[styles.newsCardFull, { backgroundColor: colors.bgCard }]}
-              onPress={() => Linking.openURL('https://www.marketwatch.com/latest-news')}
-              activeOpacity={0.8}
-            >
-              <Image 
-                source={{ uri: news.image }}
-                style={styles.newsCardImageFull}
-                resizeMode="cover"
-              />
-              <View style={styles.newsCardContentFull}>
-                <View style={styles.newsCardMeta}>
-                  <View style={styles.newsCategoryBadge}>
-                    <Text style={styles.newsCategoryText}>{news.category}</Text>
-                  </View>
-                  <Text style={[styles.newsTime, { color: colors.textMuted }]}>{news.time}</Text>
-                </View>
-                <Text style={[styles.newsCardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                  {news.title}
-                </Text>
-                <Text style={[styles.newsCardDesc, { color: colors.textMuted }]} numberOfLines={3}>
-                  {news.description}
-                </Text>
-                <View style={styles.newsCardFooter}>
-                  <Ionicons name="globe-outline" size={14} color={colors.textMuted} />
-                  <Text style={[styles.newsSource, { color: colors.textMuted }]}>MarketWatch</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+        <View style={[styles.tvWidgetContainer, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
+          <WebView
+            source={{ html: `
+              <!DOCTYPE html>
+              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+              </head><body>
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-forex-heat-map.js" async>
+                ${JSON.stringify({
+                  width: "100%",
+                  height: "100%",
+                  currencies: ["EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"],
+                  isTransparent: false,
+                  colorTheme: isDark ? "dark" : "light",
+                  locale: "en"
+                })}
+                </script>
+              </div>
+              </body></html>
+            ` }}
+            style={styles.tvWebView}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={false}
+          />
+        </View>
+      </View>
+
+      {/* Forex Screener - TradingView Widget */}
+      <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
+        <View style={styles.tvWidgetHeader}>
+          <View style={styles.tvWidgetTitleRow}>
+            <Ionicons name="search-outline" size={20} color="#06b6d4" />
+            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Forex Screener</Text>
+          </View>
+          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Real-time currency pair analysis</Text>
+        </View>
+        <View style={[styles.tvWidgetContainer, styles.tvWidgetContainerTall, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
+          <WebView
+            source={{ html: `
+              <!DOCTYPE html>
+              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+              </head><body>
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+                ${JSON.stringify({
+                  width: "100%",
+                  height: "100%",
+                  defaultColumn: "overview",
+                  defaultScreen: "general",
+                  market: "forex",
+                  showToolbar: true,
+                  colorTheme: isDark ? "dark" : "light",
+                  locale: "en",
+                  isTransparent: false
+                })}
+                </script>
+              </div>
+              </body></html>
+            ` }}
+            style={styles.tvWebView}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={true}
+          />
+        </View>
+      </View>
+
+      {/* Market News - TradingView Timeline Widget */}
+      <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
+        <View style={styles.tvWidgetHeader}>
+          <View style={styles.tvWidgetTitleRow}>
+            <Ionicons name="newspaper-outline" size={20} color="#3b82f6" />
+            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Market News</Text>
+          </View>
+          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Real-time updates from TradingView</Text>
+        </View>
+        <View style={[styles.tvWidgetContainer, styles.tvWidgetContainerTall, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
+          <WebView
+            source={{ html: `
+              <!DOCTYPE html>
+              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+              </head><body>
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
+                ${JSON.stringify({
+                  feedMode: "all_symbols",
+                  colorTheme: isDark ? "dark" : "light",
+                  isTransparent: false,
+                  displayMode: "regular",
+                  width: "100%",
+                  height: "100%",
+                  locale: "en"
+                })}
+                </script>
+              </div>
+              </body></html>
+            ` }}
+            style={styles.tvWebView}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={true}
+          />
+        </View>
+      </View>
+
+      {/* Economic Calendar - TradingView Widget */}
+      <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
+        <View style={styles.tvWidgetHeader}>
+          <View style={styles.tvWidgetTitleRow}>
+            <Ionicons name="calendar-outline" size={20} color="#a855f7" />
+            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Economic Calendar</Text>
+          </View>
+          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Upcoming economic events</Text>
+        </View>
+        <View style={[styles.tvWidgetContainer, styles.tvWidgetContainerTall, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
+          <WebView
+            source={{ html: `
+              <!DOCTYPE html>
+              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+              </head><body>
+              <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+                ${JSON.stringify({
+                  colorTheme: isDark ? "dark" : "light",
+                  isTransparent: false,
+                  width: "100%",
+                  height: "100%",
+                  locale: "en",
+                  importanceFilter: "0,1",
+                  countryFilter: "us,eu,gb,jp,cn"
+                })}
+                </script>
+              </div>
+              </body></html>
+            ` }}
+            style={styles.tvWebView}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={true}
+          />
         </View>
       </View>
 
@@ -4681,6 +4751,16 @@ const styles = StyleSheet.create({
   },
   viewFullProfileText: { color: '#dc2626', fontSize: 14, fontWeight: '600' },
   
+  // TradingView Widget Sections
+  tvWidgetSection: { marginHorizontal: 16, marginTop: 20 },
+  tvWidgetHeader: { marginBottom: 12 },
+  tvWidgetTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  tvWidgetTitle: { fontSize: 18, fontWeight: '700' },
+  tvWidgetSubtitle: { fontSize: 13, marginLeft: 28 },
+  tvWidgetContainer: { height: 310, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
+  tvWidgetContainerTall: { height: 500 },
+  tvWebView: { flex: 1 },
+
   // MarketWatch News Section
   marketWatchSection: { marginHorizontal: 16, marginTop: 16 },
   marketWatchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
