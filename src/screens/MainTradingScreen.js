@@ -760,6 +760,7 @@ const HomeTab = ({ navigation }) => {
   
   // Market data tabs state
   const [marketTab, setMarketTab] = useState('watchlist'); // 'watchlist', 'gainers', 'losers'
+  const [newsCalendarTab, setNewsCalendarTab] = useState('news'); // 'news', 'calendar'
 
   // Fetch banners on mount
   useEffect(() => {
@@ -1588,83 +1589,86 @@ const HomeTab = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Market News - TradingView Timeline Widget */}
+      {/* Market News & Economic Calendar - Tabbed */}
       <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
-        <View style={styles.tvWidgetHeader}>
-          <View style={styles.tvWidgetTitleRow}>
-            <Ionicons name="newspaper-outline" size={20} color="#3b82f6" />
-            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Market News</Text>
-          </View>
-          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Real-time updates from TradingView</Text>
+        <View style={styles.newsCalendarToggle}>
+          <TouchableOpacity
+            style={[styles.newsCalendarBtn, newsCalendarTab === 'news' && styles.newsCalendarBtnActive]}
+            onPress={() => setNewsCalendarTab('news')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="newspaper-outline" size={18} color={newsCalendarTab === 'news' ? '#fff' : colors.textMuted} />
+            <Text style={[styles.newsCalendarBtnText, newsCalendarTab === 'news' && styles.newsCalendarBtnTextActive, newsCalendarTab !== 'news' && { color: colors.textMuted }]}>Market News</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.newsCalendarBtn, newsCalendarTab === 'calendar' && styles.newsCalendarBtnActive]}
+            onPress={() => setNewsCalendarTab('calendar')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={18} color={newsCalendarTab === 'calendar' ? '#fff' : colors.textMuted} />
+            <Text style={[styles.newsCalendarBtnText, newsCalendarTab === 'calendar' && styles.newsCalendarBtnTextActive, newsCalendarTab !== 'calendar' && { color: colors.textMuted }]}>Economic Calendar</Text>
+          </TouchableOpacity>
         </View>
         <View style={[styles.tvWidgetContainer, styles.tvWidgetContainerTall, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
-          <WebView
-            source={{ html: `
-              <!DOCTYPE html>
-              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
-              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
-              </head><body>
-              <div class="tradingview-widget-container">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
-                ${JSON.stringify({
-                  feedMode: "all_symbols",
-                  colorTheme: isDark ? "dark" : "light",
-                  isTransparent: false,
-                  displayMode: "regular",
-                  width: "100%",
-                  height: "100%",
-                  locale: "en"
-                })}
-                </script>
-              </div>
-              </body></html>
-            ` }}
-            style={styles.tvWebView}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            scrollEnabled={true}
-          />
-        </View>
-      </View>
-
-      {/* Economic Calendar - TradingView Widget */}
-      <View style={[styles.tvWidgetSection, { backgroundColor: colors.bgPrimary }]}>
-        <View style={styles.tvWidgetHeader}>
-          <View style={styles.tvWidgetTitleRow}>
-            <Ionicons name="calendar-outline" size={20} color="#a855f7" />
-            <Text style={[styles.tvWidgetTitle, { color: colors.textPrimary }]}>Economic Calendar</Text>
-          </View>
-          <Text style={[styles.tvWidgetSubtitle, { color: colors.textMuted }]}>Upcoming economic events</Text>
-        </View>
-        <View style={[styles.tvWidgetContainer, styles.tvWidgetContainerTall, { backgroundColor: isDark ? '#1e1e1e' : '#fff', borderColor: colors.border }]}>
-          <WebView
-            source={{ html: `
-              <!DOCTYPE html>
-              <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
-              <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
-              </head><body>
-              <div class="tradingview-widget-container">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-                ${JSON.stringify({
-                  colorTheme: isDark ? "dark" : "light",
-                  isTransparent: false,
-                  width: "100%",
-                  height: "100%",
-                  locale: "en",
-                  importanceFilter: "0,1",
-                  countryFilter: "us,eu,gb,jp,cn"
-                })}
-                </script>
-              </div>
-              </body></html>
-            ` }}
-            style={styles.tvWebView}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            scrollEnabled={true}
-          />
+          {newsCalendarTab === 'news' ? (
+            <WebView
+              key={`news-${isDark}`}
+              source={{ html: `
+                <!DOCTYPE html>
+                <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+                <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+                </head><body>
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
+                  ${JSON.stringify({
+                    feedMode: "all_symbols",
+                    colorTheme: isDark ? "dark" : "light",
+                    isTransparent: false,
+                    displayMode: "regular",
+                    width: "100%",
+                    height: "100%",
+                    locale: "en"
+                  })}
+                  </script>
+                </div>
+                </body></html>
+              ` }}
+              style={styles.tvWebView}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scrollEnabled={true}
+            />
+          ) : (
+            <WebView
+              key={`calendar-${isDark}`}
+              source={{ html: `
+                <!DOCTYPE html>
+                <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">
+                <style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:${isDark ? '#1e1e1e' : '#fff'}}.tradingview-widget-container,.tradingview-widget-container__widget{width:100%;height:100%}</style>
+                </head><body>
+                <div class="tradingview-widget-container">
+                  <div class="tradingview-widget-container__widget"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+                  ${JSON.stringify({
+                    colorTheme: isDark ? "dark" : "light",
+                    isTransparent: false,
+                    width: "100%",
+                    height: "100%",
+                    locale: "en",
+                    importanceFilter: "0,1",
+                    countryFilter: "us,eu,gb,jp,cn"
+                  })}
+                  </script>
+                </div>
+                </body></html>
+              ` }}
+              style={styles.tvWebView}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scrollEnabled={true}
+            />
+          )}
         </View>
       </View>
 
@@ -4760,6 +4764,13 @@ const styles = StyleSheet.create({
   tvWidgetContainer: { height: 310, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
   tvWidgetContainerTall: { height: 500 },
   tvWebView: { flex: 1 },
+
+  // News & Calendar Toggle
+  newsCalendarToggle: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  newsCalendarBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'transparent' },
+  newsCalendarBtnActive: { backgroundColor: '#3b82f6', borderColor: '#3b82f6' },
+  newsCalendarBtnText: { fontSize: 13, fontWeight: '600' },
+  newsCalendarBtnTextActive: { color: '#fff' },
 
   // MarketWatch News Section
   marketWatchSection: { marginHorizontal: 16, marginTop: 16 },
