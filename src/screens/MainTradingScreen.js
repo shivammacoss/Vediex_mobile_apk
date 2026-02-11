@@ -1225,22 +1225,62 @@ const HomeTab = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Deposit/Withdraw Buttons inside card */}
+          {/* Deposit/Withdraw or Reset Demo */}
           <View style={styles.cardActionButtons}>
-            <TouchableOpacity 
-              style={[styles.depositBtn, { backgroundColor: colors.primary }]}
-              onPress={() => parentNav?.navigate('Accounts', { action: 'deposit', accountId: ctx.selectedAccount?._id })}
-            >
-              <Ionicons name="arrow-down-circle-outline" size={16} color="#fff" />
-              <Text style={styles.depositBtnText}>Deposit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.withdrawBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
-              onPress={() => parentNav?.navigate('Accounts', { action: 'withdraw', accountId: ctx.selectedAccount?._id })}
-            >
-              <Ionicons name="arrow-up-circle-outline" size={16} color={colors.textPrimary} />
-              <Text style={[styles.withdrawBtnText, { color: colors.textPrimary }]}>Withdraw</Text>
-            </TouchableOpacity>
+            {(ctx.selectedAccount?.isDemo || ctx.selectedAccount?.accountTypeId?.isDemo) ? (
+              <TouchableOpacity 
+                style={[styles.depositBtn, { flex: 1, backgroundColor: '#f59e0b' }]}
+                onPress={() => {
+                  Alert.alert(
+                    'Reset Demo Account',
+                    'Are you sure you want to reset this demo account? All open trades will be closed and balance will be reset.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Reset', style: 'destructive', onPress: async () => {
+                        try {
+                          const res = await fetch(`${API_URL}/trading-accounts/${ctx.selectedAccount._id}/reset-demo`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            Alert.alert('Success', data.message || 'Demo account reset successfully!');
+                            ctx.refreshAccounts();
+                            ctx.fetchOpenTrades();
+                            ctx.fetchTradeHistory();
+                            ctx.fetchAccountSummary();
+                          } else {
+                            Alert.alert('Error', data.message || 'Failed to reset demo account');
+                          }
+                        } catch (e) {
+                          Alert.alert('Error', 'Error resetting demo account');
+                        }
+                      }}
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="refresh" size={16} color="#fff" />
+                <Text style={styles.depositBtnText}>Reset Demo</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity 
+                  style={[styles.depositBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => parentNav?.navigate('Accounts', { action: 'deposit', accountId: ctx.selectedAccount?._id })}
+                >
+                  <Ionicons name="arrow-down-circle-outline" size={16} color="#fff" />
+                  <Text style={styles.depositBtnText}>Deposit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.withdrawBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                  onPress={() => parentNav?.navigate('Accounts', { action: 'withdraw', accountId: ctx.selectedAccount?._id })}
+                >
+                  <Ionicons name="arrow-up-circle-outline" size={16} color={colors.textPrimary} />
+                  <Text style={[styles.withdrawBtnText, { color: colors.textPrimary }]}>Withdraw</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       )}
@@ -3442,9 +3482,24 @@ const TradeTab = () => {
             </Text>
             <Text style={styles.confirmModalMessage}>
               {closeAllType === 'all' && `This will close all ${ctx.openTrades.length} open trade(s)`}
-              {closeAllType === 'profit' && 'This will close all trades currently in profit'}
-              {closeAllType === 'loss' && 'This will close all trades currently in loss'}
+              {closeAllType === 'profit' && `This will close all trades currently in profit`}
+              {closeAllType === 'loss' && `This will close all trades currently in loss`}
             </Text>
+            {(() => {
+              const trades = ctx.openTrades || [];
+              let filtered = trades;
+              if (closeAllType === 'profit') filtered = trades.filter(t => calculatePnl(t) > 0);
+              else if (closeAllType === 'loss') filtered = trades.filter(t => calculatePnl(t) < 0);
+              const totalPnl = filtered.reduce((sum, t) => sum + calculatePnl(t), 0);
+              return (
+                <View style={{ marginTop: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: totalPnl >= 0 ? '#22c55e15' : '#ef444415', borderRadius: 10, alignItems: 'center' }}>
+                  <Text style={{ color: '#999', fontSize: 12 }}>{filtered.length} trade(s) • Total P&L</Text>
+                  <Text style={{ color: totalPnl >= 0 ? '#22c55e' : '#ef4444', fontSize: 20, fontWeight: '700', marginTop: 2 }}>
+                    {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+                  </Text>
+                </View>
+              );
+            })()}
             <View style={styles.confirmModalButtons}>
               <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setShowCloseAllModal(false)} disabled={isClosingAll}>
                 <Text style={styles.confirmCancelText}>Cancel</Text>

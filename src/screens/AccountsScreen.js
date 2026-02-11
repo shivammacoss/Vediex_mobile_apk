@@ -731,7 +731,7 @@ const AccountsScreen = ({ navigation, route }) => {
           </View>
           <TouchableOpacity 
             style={[styles.walletWithdrawBtn, { backgroundColor: colors.accent }]}
-            onPress={() => { setTransferAmount(''); setShowWithdrawRequestModal(true); }}
+            onPress={() => navigation.navigate('Wallet')}
           >
             <Ionicons name="arrow-up-circle-outline" size={18} color="#fff" />
             <Text style={styles.walletWithdrawBtnText}>Withdraw</Text>
@@ -802,7 +802,8 @@ const AccountsScreen = ({ navigation, route }) => {
                   </View>
                 </View>
 
-                {/* Action Buttons */}
+                {/* Action Buttons - Hide for Demo accounts */}
+                {activeTab !== 'demo' && (
                 <View style={styles.actionButtons}>
                   <TouchableOpacity 
                     style={[styles.depositBtn, { backgroundColor: colors.accent }]}
@@ -819,6 +820,7 @@ const AccountsScreen = ({ navigation, route }) => {
                     <Text style={[styles.withdrawBtnText, { color: colors.textPrimary }]}>Withdraw</Text>
                   </TouchableOpacity>
                 </View>
+                )}
 
                 {/* Trade Button */}
                 <TouchableOpacity 
