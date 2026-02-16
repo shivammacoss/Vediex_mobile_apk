@@ -1315,9 +1315,9 @@ const HomeTab = ({ navigation }) => {
           <Ionicons name="people-outline" size={24} color={isDark ? '#eab308' : '#ca8a04'} />
           <Text style={[styles.quickActionBtnLabel, { color: colors.textSecondary }]}>IB</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('More')}>
-          <Ionicons name="grid-outline" size={24} color={isDark ? '#84cc16' : '#65a30d'} />
-          <Text style={[styles.quickActionBtnLabel, { color: colors.textSecondary }]}>More</Text>
+        <TouchableOpacity style={styles.quickActionBtn} onPress={() => parentNav?.navigate('Accounts', { activeTab: 'challenge' })}>
+          <Ionicons name="trophy-outline" size={24} color={isDark ? '#f59e0b' : '#d97706'} />
+          <Text style={[styles.quickActionBtnLabel, { color: colors.textSecondary }]}>Challenge</Text>
         </TouchableOpacity>
       </View>
 
