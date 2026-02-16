@@ -1774,13 +1774,30 @@ const QuotesTab = ({ navigation }) => {
   const [showQuickSlModal, setShowQuickSlModal] = useState(false);
   const [quickSlValue, setQuickSlValue] = useState('');
   const [pendingQuickTradeSide, setPendingQuickTradeSide] = useState(null);
+  const [showLeveragePicker, setShowLeveragePicker] = useState(false);
+  const [selectedLeverage, setSelectedLeverage] = useState(null); // null means use account default
   
-  // Get leverage from account
+  // Get max leverage from account
   const getAccountLeverage = () => {
     if (ctx.isChallengeMode && ctx.selectedChallengeAccount) {
       return ctx.selectedChallengeAccount.leverage || '1:100';
     }
     return ctx.selectedAccount?.leverage || ctx.selectedAccount?.accountTypeId?.leverage || '1:100';
+  };
+  
+  // Get current leverage (selected or account default)
+  const getCurrentLeverage = () => {
+    return selectedLeverage || getAccountLeverage();
+  };
+  
+  // Get available leverage options based on max account leverage
+  const getLeverageOptions = () => {
+    const maxLevStr = getAccountLeverage();
+    const maxLev = parseInt(maxLevStr.replace('1:', '')) || 100;
+    const allOptions = [10, 25, 50, 100, 200, 500, 1000, 2000, 5000];
+    const options = allOptions.filter(l => l <= maxLev);
+    if (!options.includes(maxLev)) options.push(maxLev);
+    return options.sort((a, b) => a - b);
   };
   
   const segments = ['Forex', 'Metals', 'Commodities', 'Crypto'];
@@ -1871,7 +1888,7 @@ const QuotesTab = ({ navigation }) => {
         quantity: parseFloat(volume) || 0.01,
         bid: finalBid,
         ask: finalAsk,
-        leverage: getAccountLeverage(),
+        leverage: getCurrentLeverage(),
       };
       
       // Add SL/TP if set (use effectiveStopLoss which includes override from quick trade modal)
@@ -2144,11 +2161,17 @@ const QuotesTab = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
 
-              {/* Leverage Display (from account) */}
-              <View style={[styles.leverageRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              {/* Leverage Selector (tappable) */}
+              <TouchableOpacity 
+                style={[styles.leverageRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                onPress={() => setShowLeveragePicker(true)}
+              >
                 <Text style={[styles.leverageLabel, { color: colors.textMuted }]}>Leverage</Text>
-                <Text style={[styles.leverageValue, { color: colors.textPrimary }]}>{getAccountLeverage()}</Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.leverageValue, { color: '#dc2626' }]}>{getCurrentLeverage()}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textMuted} style={{ marginLeft: 4 }} />
+                </View>
+              </TouchableOpacity>
 
               {/* One-Click Buy/Sell - Slim Buttons */}
               <View style={styles.quickTradeRow}>
@@ -2549,6 +2572,49 @@ const QuotesTab = ({ navigation }) => {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Leverage Picker Modal */}
+      <Modal visible={showLeveragePicker} animationType="fade" transparent onRequestClose={() => setShowLeveragePicker(false)}>
+        <TouchableOpacity 
+          style={styles.leverageModalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowLeveragePicker(false)}
+        >
+          <View style={[styles.leverageModalContent, { backgroundColor: colors.bgCard }]}>
+            <Text style={[styles.leverageModalTitle, { color: colors.textPrimary }]}>Select Leverage</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center', marginBottom: 12 }}>
+              Max: {getAccountLeverage()}
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {getLeverageOptions().map((lev) => {
+                const levStr = `1:${lev}`;
+                const isActive = getCurrentLeverage() === levStr;
+                return (
+                  <TouchableOpacity
+                    key={lev}
+                    style={[
+                      styles.leverageModalItem,
+                      isActive && styles.leverageModalItemActive
+                    ]}
+                    onPress={() => {
+                      setSelectedLeverage(levStr);
+                      setShowLeveragePicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.leverageModalItemText,
+                      isActive && styles.leverageModalItemTextActive
+                    ]}>
+                      1:{lev}
+                    </Text>
+                    {isActive && <Ionicons name="checkmark" size={18} color="#dc2626" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -3962,6 +4028,8 @@ const ChartTab = ({ route }) => {
   const [showQuickSlModal, setShowQuickSlModal] = useState(false);
   const [quickSlValue, setQuickSlValue] = useState('');
   const [pendingQuickTradeSide, setPendingQuickTradeSide] = useState(null);
+  const [showLeveragePicker, setShowLeveragePicker] = useState(false);
+  const [selectedLeverage, setSelectedLeverage] = useState(null);
   const chartOrderScrollRef = useRef(null);
 
   const chartPanelTranslateY = useRef(new Animated.Value(0)).current;
@@ -4001,6 +4069,21 @@ const ChartTab = ({ route }) => {
       return ctx.selectedChallengeAccount.leverage || '1:100';
     }
     return ctx.selectedAccount?.leverage || ctx.selectedAccount?.accountTypeId?.leverage || '1:100';
+  };
+  
+  // Get current leverage (selected or account default)
+  const getCurrentLeverage = () => {
+    return selectedLeverage || getAccountLeverage();
+  };
+  
+  // Get available leverage options based on max account leverage
+  const getLeverageOptions = () => {
+    const maxLevStr = getAccountLeverage();
+    const maxLev = parseInt(maxLevStr.replace('1:', '')) || 100;
+    const allOptions = [10, 25, 50, 100, 200, 500, 1000, 2000, 5000];
+    const options = allOptions.filter(l => l <= maxLev);
+    if (!options.includes(maxLev)) options.push(maxLev);
+    return options.sort((a, b) => a - b);
   };
 
   const activeTab = chartTabs.find(t => t.id === activeTabId) || chartTabs[0];
@@ -4084,7 +4167,7 @@ const ChartTab = ({ route }) => {
         quantity: volume,
         bid: currentPrice.bid,
         ask: currentPrice.ask,
-        leverage: ctx.isChallengeMode ? ctx.selectedChallengeAccount?.leverage : ctx.selectedAccount?.leverage || '1:100',
+        leverage: getCurrentLeverage(),
         orderType: 'MARKET'
       };
       
@@ -4151,7 +4234,7 @@ const ChartTab = ({ route }) => {
         quantity: volume,
         bid: currentPrice?.bid,
         ask: currentPrice?.ask,
-        leverage: ctx.isChallengeMode ? ctx.selectedChallengeAccount?.leverage : ctx.selectedAccount?.leverage || '1:100',
+        leverage: getCurrentLeverage(),
         orderType: effectiveOrderType
       };
       
@@ -4384,11 +4467,17 @@ const ChartTab = ({ route }) => {
                 </TouchableOpacity>
               </View>
 
-              {/* Leverage Display */}
-              <View style={[styles.leverageRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              {/* Leverage Selector (tappable) */}
+              <TouchableOpacity 
+                style={[styles.leverageRow, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                onPress={() => setShowLeveragePicker(true)}
+              >
                 <Text style={[styles.leverageLabel, { color: colors.textMuted }]}>Leverage</Text>
-                <Text style={[styles.leverageValue, { color: colors.textPrimary }]}>{getAccountLeverage()}</Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.leverageValue, { color: '#dc2626' }]}>{getCurrentLeverage()}</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textMuted} style={{ marginLeft: 4 }} />
+                </View>
+              </TouchableOpacity>
 
               {/* One-Click Buy/Sell */}
               <View style={styles.quickTradeRow}>
@@ -4715,6 +4804,49 @@ const ChartTab = ({ route }) => {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Leverage Picker Modal */}
+      <Modal visible={showLeveragePicker} animationType="fade" transparent onRequestClose={() => setShowLeveragePicker(false)}>
+        <TouchableOpacity 
+          style={styles.leverageModalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowLeveragePicker(false)}
+        >
+          <View style={[styles.leverageModalContent, { backgroundColor: colors.bgCard }]}>
+            <Text style={[styles.leverageModalTitle, { color: colors.textPrimary }]}>Select Leverage</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center', marginBottom: 12 }}>
+              Max: {getAccountLeverage()}
+            </Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {getLeverageOptions().map((lev) => {
+                const levStr = `1:${lev}`;
+                const isActive = getCurrentLeverage() === levStr;
+                return (
+                  <TouchableOpacity
+                    key={lev}
+                    style={[
+                      styles.leverageModalItem,
+                      isActive && styles.leverageModalItemActive
+                    ]}
+                    onPress={() => {
+                      setSelectedLeverage(levStr);
+                      setShowLeveragePicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.leverageModalItemText,
+                      isActive && styles.leverageModalItemTextActive
+                    ]}>
+                      1:{lev}
+                    </Text>
+                    {isActive && <Ionicons name="checkmark" size={18} color="#dc2626" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
