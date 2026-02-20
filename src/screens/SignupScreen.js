@@ -21,7 +21,10 @@ import { API_URL } from '../config';
 const { width, height } = Dimensions.get('window');
 const AUTH_URL = `${API_URL}/auth`;
 
-const SignupScreen = ({ navigation }) => {
+const SignupScreen = ({ navigation, route }) => {
+  // Get referral code from route params (deep link)
+  const urlReferralCode = route?.params?.ref || '';
+  const [referralCodeLocked, setReferralCodeLocked] = useState(!!urlReferralCode);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [otpRequired, setOtpRequired] = useState(false);
@@ -36,6 +39,7 @@ const SignupScreen = ({ navigation }) => {
     email: '',
     phone: '',
     password: '',
+    referralCode: urlReferralCode,
   });
 
   // Check if OTP is required on mount
@@ -124,6 +128,23 @@ const SignupScreen = ({ navigation }) => {
             throw new Error(signupData.message || 'Signup failed');
           }
           
+          // Register referral if code was provided
+          if (formData.referralCode && signupData.user?._id) {
+            try {
+              await fetch(`${API_URL}/ib/register-referral`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: signupData.user._id,
+                  referralCode: formData.referralCode
+                })
+              });
+              console.log('Referral registered:', formData.referralCode);
+            } catch (refError) {
+              console.error('Error registering referral:', refError);
+            }
+          }
+          
           // Account created successfully - redirect to login
           Alert.alert(
             'Account Created!', 
@@ -176,6 +197,23 @@ const SignupScreen = ({ navigation }) => {
       await SecureStore.setItemAsync('user', JSON.stringify(data.user));
       if (data.token) {
         await SecureStore.setItemAsync('token', data.token);
+      }
+      
+      // Register referral if code was provided
+      if (formData.referralCode && data.user?._id) {
+        try {
+          await fetch(`${API_URL}/ib/register-referral`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: data.user._id,
+              referralCode: formData.referralCode
+            })
+          });
+          console.log('Referral registered:', formData.referralCode);
+        } catch (refError) {
+          console.error('Error registering referral:', refError);
+        }
       }
       
       navigation.replace('MainTrading');
@@ -346,6 +384,23 @@ const SignupScreen = ({ navigation }) => {
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
                 <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color="#666" />
               </TouchableOpacity>
+            </View>
+
+            {/* Referral Code Input - Optional */}
+            <View style={[styles.inputContainer, referralCodeLocked && styles.inputDisabled]}>
+              <Ionicons name="gift-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Referral code (optional)"
+                placeholderTextColor="#666"
+                autoCapitalize="characters"
+                value={formData.referralCode}
+                onChangeText={(text) => setFormData({ ...formData, referralCode: text.toUpperCase() })}
+                editable={!referralCodeLocked}
+              />
+              {referralCodeLocked && (
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              )}
             </View>
 
             {/* Signup Button */}
