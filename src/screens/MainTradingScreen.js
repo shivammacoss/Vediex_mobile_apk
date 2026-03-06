@@ -2688,11 +2688,15 @@ const TradeTab = () => {
   // Calculate PnL for a trade (includes charges - commission + swap)
   const calculatePnl = (trade) => {
     const prices = ctx.livePrices[trade.symbol];
-    if (!prices?.bid || !prices?.ask) return 0;
+    if (!prices?.bid || !prices?.ask) {
+      // Fallback to trade's stored unrealizedPnl if no live prices
+      return trade.unrealizedPnl || trade.pnl || 0;
+    }
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask;
+    const contractSize = trade.contractSize || 100000;
     const rawPnl = trade.side === 'BUY'
-      ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
-      : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize;
+      ? (currentPrice - trade.openPrice) * trade.quantity * contractSize
+      : (trade.openPrice - currentPrice) * trade.quantity * contractSize;
     // Include charges (commission + swap)
     return rawPnl - (trade.commission || 0) - (trade.swap || 0);
   };
