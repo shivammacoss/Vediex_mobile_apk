@@ -2685,14 +2685,16 @@ const TradeTab = () => {
     return getFilteredHistory().reduce((sum, trade) => sum + (trade.realizedPnl || 0), 0);
   };
 
-  // Calculate PnL for a trade
+  // Calculate PnL for a trade (includes charges - commission + swap)
   const calculatePnl = (trade) => {
     const prices = ctx.livePrices[trade.symbol];
     if (!prices?.bid || !prices?.ask) return 0;
     const currentPrice = trade.side === 'BUY' ? prices.bid : prices.ask;
-    return trade.side === 'BUY'
+    const rawPnl = trade.side === 'BUY'
       ? (currentPrice - trade.openPrice) * trade.quantity * trade.contractSize
       : (trade.openPrice - currentPrice) * trade.quantity * trade.contractSize;
+    // Include charges (commission + swap)
+    return rawPnl - (trade.commission || 0) - (trade.swap || 0);
   };
 
   // Close single trade
@@ -2743,7 +2745,7 @@ const TradeTab = () => {
     setShowCloseTradeModal(true);
   };
 
-  // Calculate PnL for close trade modal
+  // Calculate PnL for close trade modal (includes charges - commission + swap)
   const calculateClosePnl = (trade, lots = null) => {
     if (!trade) return 0;
     const prices = ctx.livePrices[trade.symbol];
@@ -2751,9 +2753,17 @@ const TradeTab = () => {
     const quantity = lots || trade.quantity;
     const contractSize = trade.contractSize || 100000;
     const exitPrice = trade.side === 'BUY' ? prices.bid : prices.ask;
-    return trade.side === 'BUY'
+    
+    const rawPnl = trade.side === 'BUY'
       ? (exitPrice - trade.openPrice) * quantity * contractSize
       : (trade.openPrice - exitPrice) * quantity * contractSize;
+    
+    // Include proportional charges (commission + swap)
+    const lotRatio = lots ? (lots / trade.quantity) : 1;
+    const commission = (trade.commission || 0) * lotRatio;
+    const swap = (trade.swap || 0) * lotRatio;
+    
+    return rawPnl - commission - swap;
   };
 
   // Handle Partial Close
