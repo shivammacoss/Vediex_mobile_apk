@@ -547,9 +547,44 @@ const TradingProvider = ({ children, navigation, route }) => {
     const accountId = isChallengeMode && selectedChallengeAccount ? selectedChallengeAccount._id : selectedAccount?._id;
     if (!accountId) return;
     try {
+      // Fetch closed trades
       const res = await fetch(`${API_URL}/trade/history/${accountId}?limit=50`);
       const data = await res.json();
-      if (data.success) setTradeHistory(data.trades || []);
+      const closedTrades = data.success ? (data.trades || []) : [];
+      
+      // Fetch partial close history for this account
+      let partialCloses = [];
+      try {
+        const partialRes = await fetch(`${API_URL}/trade/partial-history-account/${accountId}`);
+        const partialData = await partialRes.json();
+        if (partialData.success && partialData.history) {
+          partialCloses = partialData.history.map(pc => ({
+            _id: pc._id,
+            tradeId: pc.tradeIdString || pc.tradeId,
+            symbol: pc.symbol,
+            side: pc.side,
+            quantity: pc.closedLot,
+            openPrice: pc.openPrice,
+            closePrice: pc.closePrice,
+            realizedPnl: pc.realizedPnl,
+            commission: pc.commission,
+            swap: pc.swap,
+            status: 'CLOSED',
+            closedAt: pc.closedAt,
+            isPartialClose: true,
+            originalLot: pc.originalLot,
+            remainingLot: pc.remainingLot
+          }));
+        }
+      } catch (partialErr) {
+        // Silently ignore if partial history endpoint not available
+      }
+      
+      // Combine and sort by closedAt descending
+      const allTrades = [...closedTrades, ...partialCloses]
+        .sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt));
+      
+      setTradeHistory(allTrades);
     } catch (e) {}
   };
 
@@ -3302,6 +3337,11 @@ const TradeTab = () => {
                     <View style={styles.historyLeft}>
                       <Text style={[styles.historySymbol, { color: colors.textPrimary }]}>{trade.symbol}</Text>
                       <Text style={[styles.historySide, { color: trade.side === 'BUY' ? '#22c55e' : '#ef4444' }]}>{trade.side}</Text>
+                      {trade.isPartialClose && (
+                        <View style={[styles.adminBadge, { backgroundColor: '#3b82f6' }]}>
+                          <Text style={styles.adminBadgeText}>Partial</Text>
+                        </View>
+                      )}
                       {trade.closedBy === 'ADMIN' && (
                         <View style={styles.adminBadge}>
                           <Text style={styles.adminBadgeText}>Admin Close</Text>
