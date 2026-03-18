@@ -1461,7 +1461,7 @@ const HomeTab = ({ navigation }) => {
                 <TouchableOpacity 
                   key={inst.symbol} 
                   style={[styles.marketItem, { borderBottomColor: colors.border }]}
-                  onPress={() => navigation.navigate('Chart')}
+                  onPress={() => navigation.navigate('Chart', { symbol: inst.symbol })}
                 >
                   <View style={styles.marketItemLeft}>
                     <Text style={[styles.marketSymbol, { color: colors.textPrimary }]}>{inst.symbol}</Text>
@@ -4171,6 +4171,9 @@ const ChartTab = ({ route }) => {
       'USDCHF': 'OANDA:USDCHF', 'AUDUSD': 'OANDA:AUDUSD', 'NZDUSD': 'OANDA:NZDUSD',
       'USDCAD': 'OANDA:USDCAD', 'EURGBP': 'OANDA:EURGBP', 'EURJPY': 'OANDA:EURJPY',
       'GBPJPY': 'OANDA:GBPJPY', 'XAUUSD': 'OANDA:XAUUSD', 'XAGUSD': 'OANDA:XAGUSD',
+      'XPTUSD': 'OANDA:XPTUSD', 'XPDUSD': 'OANDA:XPDUSD',
+      'USOIL': 'TVC:USOIL', 'UKOIL': 'TVC:UKOIL', 'NGAS': 'TVC:NATURALGAS',
+      'COPPER': 'COMEX:HG1!', 'ALUMINUM': 'LME:ALI1!', 'NICKEL': 'LME:NI1!',
       'BTCUSD': 'COINBASE:BTCUSD', 'ETHUSD': 'COINBASE:ETHUSD', 'LTCUSD': 'COINBASE:LTCUSD',
       'XRPUSD': 'BITSTAMP:XRPUSD', 'BNBUSD': 'BINANCE:BNBUSDT', 'SOLUSD': 'COINBASE:SOLUSD',
       'ADAUSD': 'COINBASE:ADAUSD', 'DOGEUSD': 'BINANCE:DOGEUSDT', 'DOTUSD': 'COINBASE:DOTUSD',
